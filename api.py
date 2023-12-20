@@ -17,6 +17,8 @@ from transformers import (
     ViTFeatureExtractor,
 )
 
+from modules.translator import Translator
+
 
 class Api:
     def __init__(
@@ -51,13 +53,14 @@ class Api:
             "google/vit-base-patch16-224"
         )
         self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        self.translator = Translator(from_lang="en", to_lang="vi")
 
         @self.app.get("/")
         async def root():
             return {"message": "hello"}
 
         @self.app.post("/blip")
-        async def inference_blip(file: UploadFile):
+        async def inference_blip(file: UploadFile, language: Optional[str]):
             file_extension = pathlib.Path(file.filename).suffix
             if file_extension.lower() not in [".jpg", ".jpeg"]:
                 raise HTTPException(
@@ -71,10 +74,15 @@ class Api:
                 file_object.write(file.file.read())
 
             generated_caption = self.generate_caption_blip(image_path=file_location)
-            return {"caption": generated_caption}
+            translated_caption = self.translator(
+                text=generated_caption, to_lang=language
+            )
+            return {"caption": translated_caption}
 
         @self.app.post("/vision-encoder-decoder")
-        async def inference_vision_encoder_decoder(file: UploadFile):
+        async def inference_vision_encoder_decoder(
+            file: UploadFile, language: Optional[str]
+        ):
             file_extension = pathlib.Path(file.filename).suffix
             if file_extension.lower() not in [".jpg", ".jpeg"]:
                 raise HTTPException(
@@ -91,7 +99,10 @@ class Api:
             generated_caption = self.generate_caption_vision_encoder_decoder(
                 image_path=file_location
             )
-            return {"caption": generated_caption}
+            translated_caption = self.translator(
+                text=generated_caption, to_lang=language
+            )
+            return {"caption": translated_caption}
 
     def generate_caption_blip(self, image_path: Optional[str]):
         image = Image.open(image_path)
